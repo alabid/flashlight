@@ -7,8 +7,11 @@
 
 #include "flashlight/app/asr/data/FeatureTransforms.h"
 
+#include <unistd.h>
 #include <algorithm>
 #include <stdexcept>
+#include <thread>
+#include <mutex>
 
 #include "flashlight/app/asr/data/Utils.h"
 #include "flashlight/lib/audio/feature/Mfcc.h"
@@ -22,6 +25,24 @@ using fl::lib::text::Dictionary;
 using fl::lib::text::LexiconMap;
 using fl::lib::text::packReplabels;
 
+namespace {
+
+struct IterCounter {
+  explicit IterCounter(int n) : iter_(n) {}
+  bool done() {
+    std::lock_guard l(iterMutex_);
+    return iter_ <= 0;
+  }
+  void increment() {
+    std::lock_guard l(iterMutex_);
+    iter_ = iter_ > 0 ? iter_ - 1 : iter_;
+  }
+  int iter_;
+  std::mutex iterMutex_;
+};
+
+} // namespace
+
 namespace fl {
 namespace app {
 namespace asr {
@@ -30,8 +51,9 @@ fl::Dataset::DataTransformFunction inputFeatures(
     const FeatureParams& params,
     const FeatureType& featureType,
     const std::pair<int, int>& localNormCtx,
-    const std::vector<sfx::SoundEffectConfig>& sfxConf) {
-  return [params, featureType, localNormCtx, sfxConf](
+    const std::vector<sfx::SoundEffectConfig>& sfxConf /* = {} */,
+    const int sfxStartUpdate /* = 0 */) {
+  return [params, featureType, localNormCtx, sfxConf, sfxStartUpdate](
              void* data, af::dim4 dims, af::dtype type) {
     if (type != af::dtype::f32) {
       throw std::invalid_argument("Invalid input type");
@@ -46,13 +68,17 @@ fl::Dataset::DataTransformFunction inputFeatures(
     if (channels > 1) {
       input = transpose2d(input, dims[1], channels);
     }
-    if (!sfxConf.empty()) {
+    static IterCounter delaySfxIter(sfxStartUpdate);
+    thread_local auto seed =
+        ::getpid() + std::hash<std::thread::id>()(std::this_thread::get_id());
+    thread_local std::shared_ptr<sfx::SoundEffect> sfx =
+        sfx::createSoundEffect(sfxConf, seed);
+    delaySfxIter.increment();
+    if (delaySfxIter.done() && !sfxConf.empty()) {
       if (channels > 1) {
         throw std::invalid_argument(
             "'inputFeatures': Invalid input dims. sound effect supports a single channel audio");
       }
-      thread_local std::shared_ptr<sfx::SoundEffect> sfx =
-          sfx::createSoundEffect(sfxConf);
       sfx->apply(input);
     }
     std::vector<float> output;
