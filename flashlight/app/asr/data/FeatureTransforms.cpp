@@ -28,17 +28,19 @@ using fl::lib::text::packReplabels;
 namespace {
 
 struct IterCounter {
-  explicit IterCounter(int n) : iter_(n) {}
+  explicit IterCounter(int n) : iter_(n) {
+    std::cout << "created iter with " << n << std::endl;
+  }
   bool done() {
-    std::lock_guard l(iterMutex_);
     return iter_ <= 0;
   }
   void increment() {
-    std::lock_guard l(iterMutex_);
+    if (iter_==1) {
+      std::cout << "last increment"  << std::endl;
+    }
     iter_ = iter_ > 0 ? iter_ - 1 : iter_;
   }
   int iter_;
-  std::mutex iterMutex_;
 };
 
 } // namespace

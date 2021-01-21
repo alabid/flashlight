@@ -1,0 +1,16 @@
+ {
+      "soundEffectChain": [
+          {
+              "type": "AdditiveNoise",
+              "additiveNoiseConfig": {
+                  "proba": 1.0,
+                  "ratio": 1.0,
+                  "minSnr": 0.0,
+                  "maxSnr": 10.0,
+                  "nClipsMin": 1,
+                  "nClipsMax": 3,
+                  "listFilePath": "/checkpoint/vineelkpratap/data/audioset/train_segments.lst"
+              }
+          }
+      ]
+  }

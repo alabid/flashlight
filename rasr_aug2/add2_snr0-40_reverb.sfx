@@ -1,0 +1,31 @@
+ {
+      "soundEffectChain": [
+          {
+              "type": "AdditiveNoise",
+              "additiveNoiseConfig": {
+                  "proba": 0.5,
+                  "ratio": 1.0,
+                  "minSnr": 0.0,
+                  "maxSnr": 40.0,
+                  "nClipsMin": 1,
+                  "nClipsMax": 3,
+                  "listFilePath": "/checkpoint/vineelkpratap/data/audioset/train_segments.lst"
+              }
+          },
+          {
+              "type": "ReverbEcho",
+              "reverbEchoConfig": {
+                  "proba": 0.5,
+                  "initialMin": 0.3,
+                  "initialMax": 0.3,
+                  "rt60Min": 0.3,
+                  "rt60Max": 1.3,
+                  "firstDelayMin": 0.01,
+                  "firstDelayMax": 0.03,
+                  "repeat": 3,
+                  "jitter": 0.1,
+                  "sampleRate": 16000
+              }
+          }
+      ]
+  }
