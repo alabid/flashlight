@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5.1)
 set(GTEST_IMPORTED_TARGETS "")
 
 # Get or find Google Test and Google Mock
-find_package(GTest 1.10.0)
+#find_package(GTest 1.10.0)
 if (NOT GTEST_FOUND)
   if (NOT TARGET gtest)
     message(STATUS "googletest not found - will download and build from source")

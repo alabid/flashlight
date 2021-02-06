@@ -16,6 +16,23 @@ using namespace ::fl::app::asr::sfx;
 
 const int numSamples = 10000;
 
+double timeit(std::function<void()> fn) {
+  // warmup
+  for (int i = 0; i < 10; ++i) {
+    fn();
+  }
+  af::sync();
+
+  int num_iters = 100;
+  af::sync();
+  auto start = af::timer::start();
+  for (int i = 0; i < num_iters; i++) {
+    fn();
+  }
+  af::sync();
+  return af::timer::stop(start) / num_iters;
+}
+
 TEST(GaussianNoise, SnrCheck) {
   int numTrys = 10;
   float tolerance = 1e-1;

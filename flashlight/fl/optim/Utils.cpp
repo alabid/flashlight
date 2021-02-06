@@ -20,10 +20,7 @@ double clipGradNorm(const std::vector<Variable>& parameters, double max_norm) {
     // Only if gradients are fp16, compute the norm on grads that are cast to
     // f32. This cast can be removed when support for fp16 inputs is added.
     // https://github.com/arrayfire/arrayfire/blob/v3.7.1/src/api/c/norm.cpp#L128
-    grad_norm += std::pow(
-        af::norm(af::flat(
-            (grad.type() == af::dtype::f16 ? grad.as(af::dtype::f32) : grad))),
-        2);
+    grad_norm += af::sum<double>(grad * grad);
   }
   grad_norm = std::sqrt(grad_norm);
   double scale = (max_norm / grad_norm);

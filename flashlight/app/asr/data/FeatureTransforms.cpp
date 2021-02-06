@@ -9,6 +9,8 @@
 
 #include <unistd.h>
 #include <algorithm>
+#include <atomic>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
 #include <mutex>
@@ -18,6 +20,7 @@
 #include "flashlight/lib/audio/feature/Mfsc.h"
 #include "flashlight/lib/audio/feature/PowerSpectrum.h"
 #include "flashlight/lib/common/String.h"
+#include "flashlight/lib/common/System.h"
 
 using namespace fl::lib;
 using namespace fl::lib::audio;
@@ -27,20 +30,25 @@ using fl::lib::text::packReplabels;
 
 namespace {
 
-struct IterCounter {
-  explicit IterCounter(int n) : iter_(n) {
-    std::cout << "created iter with " << n << std::endl;
+size_t getSfxSeed() {
+  auto a = fl::lib::getProcessId();
+  auto b = fl::lib::getThreadId();
+  // Create an unique hash from thread, process id
+  // using Cantor pairing function
+  return 0.5 * (a + b) * (a + b + 1) + b;
+}
+
+class StartSfxCounter {
+ public:
+  explicit StartSfxCounter(int n) : iters_(n) {}
+  bool decrementAndCheck() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    iters_ = iters_ > 0 ? iters_ - 1 : iters_;
+    return iters_ <= 0;
   }
-  bool done() {
-    return iter_ <= 0;
-  }
-  void increment() {
-    if (iter_==1) {
-      std::cout << "last increment"  << std::endl;
-    }
-    iter_ = iter_ > 0 ? iter_ - 1 : iter_;
-  }
-  int iter_;
+ private:
+  int iters_;
+  std::mutex mutex_;
 };
 
 } // namespace
@@ -55,7 +63,8 @@ fl::Dataset::DataTransformFunction inputFeatures(
     const std::pair<int, int>& localNormCtx,
     const std::vector<sfx::SoundEffectConfig>& sfxConf /* = {} */,
     const int sfxStartUpdate /* = 0 */) {
-  return [params, featureType, localNormCtx, sfxConf, sfxStartUpdate](
+  auto sfxCounter = std::make_shared<StartSfxCounter>(sfxStartUpdate);
+  return [params, featureType, localNormCtx, sfxConf, sfxCounter](
              void* data, af::dim4 dims, af::dtype type) {
     if (type != af::dtype::f32) {
       throw std::invalid_argument("Invalid input type");
@@ -70,17 +79,14 @@ fl::Dataset::DataTransformFunction inputFeatures(
     if (channels > 1) {
       input = transpose2d(input, dims[1], channels);
     }
-    static IterCounter delaySfxIter(sfxStartUpdate);
-    thread_local auto seed =
-        ::getpid() + std::hash<std::thread::id>()(std::this_thread::get_id());
-    thread_local std::shared_ptr<sfx::SoundEffect> sfx =
-        sfx::createSoundEffect(sfxConf, seed);
-    delaySfxIter.increment();
-    if (delaySfxIter.done() && !sfxConf.empty()) {
+    if (!sfxConf.empty() && sfxCounter->decrementAndCheck()) {
       if (channels > 1) {
         throw std::invalid_argument(
             "'inputFeatures': Invalid input dims. sound effect supports a single channel audio");
       }
+      thread_local auto seed = getSfxSeed();
+      thread_local std::shared_ptr<sfx::SoundEffect> sfx =
+          sfx::createSoundEffect(sfxConf, seed);
       sfx->apply(input);
     }
     std::vector<float> output;
